@@ -1,0 +1,6 @@
+interface:
+  display_name: "Quant Trading"
+  short_description: "A-share quantitative trading: signal engine, backtesting & stock screening"
+  icon_small: ""
+  icon_large: ""
+  default_prompt: "Use $quant-trading to analyze A-stock signals, run backtests, or screen stocks."

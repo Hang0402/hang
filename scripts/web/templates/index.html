@@ -1,0 +1,418 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>量价关系量化交易系统</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Segoe UI","Microsoft YaHei",sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh}
+.header{background:#161b22;border-bottom:1px solid #30363d;padding:12px 24px;display:flex;align-items:center;justify-content:space-between}
+.header h1{font-size:20px;color:#58a6ff}
+.header .sub{font-size:12px;color:#8b949e}
+.tabs{display:flex;gap:0;background:#161b22;border-bottom:1px solid #30363d;padding:0 24px}
+.tab{padding:10px 20px;cursor:pointer;font-size:14px;color:#8b949e;border-bottom:2px solid transparent;transition:all .2s}
+.tab:hover{color:#c9d1d9}
+.tab.active{color:#58a6ff;border-bottom-color:#58a6ff}
+.toolbar{display:flex;gap:10px;align-items:center}
+.toolbar input{padding:8px 12px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;font-size:14px;width:120px}
+.toolbar button{padding:8px 16px;background:#238636;border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:14px;font-weight:600}
+.toolbar button:hover{background:#2ea043}
+.toolbar button.secondary{background:#21262d;border:1px solid #30363d}
+.toolbar button.secondary:hover{background:#30363d}
+.toolbar button.danger{background:#da3633}
+.toolbar button.danger:hover{background:#f85149}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px 24px;max-width:1600px;margin:0 auto}
+.panel{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;overflow:hidden}
+.panel.full{grid-column:1/-1}
+.panel h2{font-size:15px;color:#58a6ff;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #21262d}
+.chart-container{width:100%;height:400px}
+.chart-container.tall{height:500px}
+.chart-placeholder{display:flex;align-items:center;justify-content:center;height:100%;color:#8b949e;font-size:14px}
+.signal-card{background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:10px 14px;margin-bottom:8px;font-size:13px}
+.signal-card.bullish{border-left:3px solid #3fb950}
+.signal-card.bearish{border-left:3px solid #f85149}
+.signal-card.neutral{border-left:3px solid #d2991d}
+.signal-card .sig-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.signal-card .sig-id{font-weight:700;font-size:14px}
+.signal-card .sig-desc{color:#8b949e;margin:4px 0}
+.signal-card .sig-sugg{color:#58a6ff;font-size:12px;margin-top:4px}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.metric{background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:12px;text-align:center}
+.metric .value{font-size:24px;font-weight:700}
+.metric .label{font-size:11px;color:#8b949e;margin-top:4px}
+.metric .value.green{color:#3fb950}
+.metric .value.red{color:#f85149}
+.metric .value.blue{color:#58a6ff}
+.metric .value.yellow{color:#d2991d}
+.monitor-status{display:flex;align-items:center;gap:8px;font-size:14px}
+.monitor-status .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.monitor-status .dot.active{background:#3fb950;box-shadow:0 0 8px #3fb950;animation:pulse 2s infinite}
+.monitor-status .dot.inactive{background:#f85149}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.reference-table{width:100%;font-size:12px;border-collapse:collapse}
+.reference-table th{text-align:left;padding:6px 8px;border-bottom:1px solid #30363d;color:#58a6ff;background:#161b22}
+.reference-table td{padding:6px 8px;border-bottom:1px solid #21262d}
+.reference-table tr:hover{background:#0d1117}
+.tag{padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600}
+.tag-bullish{background:#1a3a1a;color:#3fb950}
+.tag-bearish{background:#3a1a1a;color:#f85149}
+.tag-neutral{background:#3a351a;color:#d2991d}
+.loading{text-align:center;padding:40px;color:#8b949e}
+.error{color:#f85149;padding:20px;text-align:center}
+.scrollable{max-height:450px;overflow-y:auto}
+.trade-list{max-height:300px;overflow-y:auto;font-size:12px}
+.trade-row{display:flex;justify-content:space-between;padding:4px 8px;border-bottom:1px solid #21262d}
+.trade-row .win{color:#3fb950}
+.trade-row .loss{color:#f85149}
+/* Screening */
+.progress-container{width:100%;height:6px;background:#21262d;border-radius:3px;overflow:hidden;margin:16px 0}
+.progress-bar{height:100%;width:0%;background:linear-gradient(90deg,#238636,#58a6ff);border-radius:3px;animation:progressMove 2s ease-in-out infinite}
+@keyframes progressMove{0%{width:10%}50%{width:70%}100%{width:10%}}
+.screen-status{display:flex;justify-content:center;align-items:center;gap:12px;padding:20px;font-size:13px}
+.screen-status .elapsed{color:#58a6ff;font-weight:600;min-width:50px;text-align:center}
+.screen-table{width:100%;font-size:12px;border-collapse:collapse}
+.screen-table th{text-align:left;padding:6px 8px;border-bottom:1px solid #30363d;color:#58a6ff;background:#161b22;position:sticky;top:0;z-index:1}
+.screen-table td{padding:6px 8px;border-bottom:1px solid #21262d}
+.screen-table tr:hover{background:#1c2333;cursor:pointer}
+.screen-table .rank{font-weight:700;color:#58a6ff}
+.screen-table .score-total{font-weight:700;color:#d2991d}
+.screen-table .gain-up{color:#3fb950}
+.detail-panel{display:none;margin-top:16px;padding:16px;background:#0d1117;border:1px solid #30363d;border-radius:8px}
+.detail-panel.active{display:block}
+.detail-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>量价关系量化交易系统</h1>
+    <div class="sub">Volume-Price Signal Engine + Stock Screener</div>
+  </div>
+  <div class="toolbar">
+    <input type="text" id="codeInput" value="600519" placeholder="股票代码">
+    <button onclick="scanSignals()">扫描信号</button>
+    <button onclick="runBacktest()" class="secondary">回测</button>
+    <button onclick="runMonitor()" class="secondary">实时监测</button>
+    <span class="monitor-status">
+      <span class="dot" id="monitorDot"></span>
+      <span id="monitorLabel" style="font-size:12px;color:#8b949e">就绪</span>
+    </span>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('analysis')">信号分析</div>
+  <div class="tab" onclick="switchTab('screening')">四层选股</div>
+</div>
+
+<!-- Tab: 信号分析 -->
+<div id="tab-analysis" class="tab-content active">
+<div class="grid">
+  <div class="panel full">
+    <h2>K线图 & 成交量</h2>
+    <div id="klineChart" class="chart-container tall">
+      <div class="chart-placeholder">输入股票代码，点击按钮加载图表</div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>实时监测信号</h2>
+    <div id="monitorPanel"><div class="loading">点击"实时监测"加载</div></div>
+  </div>
+  <div class="panel">
+    <h2>回测结果</h2>
+    <div id="backtestPanel"><div class="loading">点击"回测"加载</div></div>
+  </div>
+  <div class="panel">
+    <h2>信号扫描 (<span id="signalCount">0</span>)</h2>
+    <div id="signalList" class="scrollable"><div class="loading">输入代码扫描信号</div></div>
+  </div>
+  <div class="panel">
+    <h2>八大信号说明</h2>
+    <div id="signalDefs"><div class="loading">加载中...</div></div>
+  </div>
+</div>
+</div>
+
+<!-- Tab: 四层选股 -->
+<div id="tab-screening" class="tab-content">
+<div style="max-width:1600px;margin:0 auto;padding:16px 24px">
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="border:none;margin:0;padding:0">四层量化筛选</h2>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span style="font-size:12px;color:#8b949e">非ST · ROE>10% · 负债率<60% · 趋势>MA20>MA60 · 20日涨>10% · 换手>3% · 放量</span>
+        <button id="btnScreen" onclick="runScreening()">开始筛选</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screenProgress" style="display:none">
+    <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="screen-status">
+      <span id="screenStatusText">正在获取实时行情...</span>
+      <span class="elapsed" id="screenElapsed">00:00</span>
+    </div>
+  </div>
+
+  <div id="screenStats" style="display:none;margin:12px 0;font-size:13px;color:#8b949e;text-align:center"></div>
+
+  <div class="panel" id="screenResultsPanel" style="display:none">
+    <h2>筛选结果 <span id="screenCount" style="color:#8b949e;font-weight:400"></span></h2>
+    <div style="max-height:500px;overflow-y:auto">
+      <table class="screen-table" id="screenTable">
+        <thead>
+          <tr>
+            <th>#</th><th>代码</th><th>名称</th><th>总分</th>
+            <th>趋势</th><th>量能</th><th>财务</th><th>估值</th>
+            <th>ROE%</th><th>PE</th><th>20日涨%</th><th>换手%</th>
+          </tr>
+        </thead>
+        <tbody id="screenTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="detail-panel" id="stockDetail">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="border:none;margin:0;padding:0">个股详情: <span id="detailName"></span></h2>
+      <div style="display:flex;gap:8px">
+        <button onclick="viewInAnalysis()" class="secondary">跳转信号分析</button>
+        <button onclick="document.getElementById('stockDetail').classList.remove('active')" class="secondary">关闭</button>
+      </div>
+    </div>
+    <div class="detail-grid" id="detailGrid"></div>
+    <div id="detailRecent" style="margin-top:12px"></div>
+  </div>
+</div>
+</div>
+
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<script>
+var API="";
+var screenResults=[];
+var selectedStockCode="";
+var screenTimer=null;
+
+function switchTab(tab){
+  document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")});
+  document.querySelectorAll(".tab-content").forEach(function(t){t.classList.remove("active")});
+  if(tab==="analysis"){document.querySelectorAll(".tab")[0].classList.add("active");document.getElementById("tab-analysis").classList.add("active")}
+  else{document.querySelectorAll(".tab")[1].classList.add("active");document.getElementById("tab-screening").classList.add("active")}
+}
+
+function rSig(s){
+  return '<div class="signal-card '+(s.direction==="bullish"?"bullish":s.direction==="bearish"?"bearish":"neutral")+'">'
+    +'<div class="sig-header"><span class="sig-id">'+s.signal_id+' '+s.description.split("：")[0]+'</span>'
+    +'<span class="tag tag-'+(s.direction==="bullish"?"bullish":s.direction==="bearish"?"bearish":"neutral")+'">'+(s.confidence||0).toFixed(0)+'%</span></div>'
+    +'<div class="sig-desc">'+s.description+'</div>'
+    +'<div class="sig-sugg">'+s.suggestion+'</div></div>';
+}
+
+// ========== 信号分析 TAB ==========
+function scanSignals(){
+  var code=document.getElementById("codeInput").value;
+  document.getElementById("signalList").innerHTML='<div class="loading">扫描中...</div>';
+  document.getElementById("klineChart").innerHTML='<div class="chart-placeholder">加载中...</div>';
+  fetch(API+"/api/scan?code="+code).then(function(r){return r.json()}).then(function(d){
+    if(d.error){document.getElementById("signalList").innerHTML='<div class="error">'+d.error+'</div>';return}
+    document.getElementById("signalCount").textContent=d.total_signals;
+    document.getElementById("signalList").innerHTML=d.signals.length===0?'<div style="color:#8b949e;padding:20px;text-align:center">无信号</div>':d.signals.map(rSig).join("");
+    fetch(API+"/api/history?code="+code).then(function(r){return r.json()}).then(function(h){
+      if(h.error)return;
+      var dates=h.data.map(function(d){return d.date});
+      var closes=h.data.map(function(d){return d.close});
+      var vols=h.data.map(function(d){return d.volume});
+      var kdiv=document.getElementById("klineChart");kdiv.innerHTML="";
+      Plotly.newPlot(kdiv,[
+        {x:dates,open:h.data.map(function(d){return d.open}),high:h.data.map(function(d){return d.high}),low:h.data.map(function(d){return d.low}),close:closes,type:"candlestick",name:"K线",increasing:{line:{color:"#3fb950"},fillcolor:"#3fb950"},decreasing:{line:{color:"#f85149"},fillcolor:"#f85149"},xaxis:"x",yaxis:"y"},
+        {x:dates,y:vols,type:"bar",name:"成交量",marker:{color:vols.map(function(v,i){return closes[i]>=(h.data[i-1]||h.data[i]).close?"rgba(63,185,80,0.4)":"rgba(248,81,73,0.4)"})},xaxis:"x",yaxis:"y2"}
+      ],{
+        paper_bgcolor:"#161b22",plot_bgcolor:"#161b22",font:{color:"#c9d1d9",size:11},
+        margin:{l:50,r:20,t:20,b:40},
+        xaxis:{gridcolor:"#21262d",rangeslider:{visible:false}},
+        yaxis:{gridcolor:"#21262d",title:"价格"},
+        yaxis2:{gridcolor:"#21262d",title:"成交量",overlaying:"y",side:"right",showgrid:false},
+        showlegend:false
+      },{responsive:true,displayModeBar:false});
+    });
+  }).catch(function(e){document.getElementById("signalList").innerHTML='<div class="error">'+e.message+'</div>'});
+}
+
+function runBacktest(){
+  var code=document.getElementById("codeInput").value;
+  document.getElementById("backtestPanel").innerHTML='<div class="loading">回测中...</div>';
+  fetch(API+"/api/backtest?code="+code+"&start=2023-01-01").then(function(r){return r.json()}).then(function(d){
+    if(d.error){document.getElementById("backtestPanel").innerHTML='<div class="error">'+d.error+'</div>';return}
+    var h='<div class="metrics">'
+      +'<div class="metric"><div class="value blue">'+d.total_trades+'</div><div class="label">总交易</div></div>'
+      +'<div class="metric"><div class="value '+(d.win_rate>=50?"green":"red")+'">'+d.win_rate+'%</div><div class="label">胜率</div></div>'
+      +'<div class="metric"><div class="value '+(d.total_return>=0?"green":"red")+'">'+d.total_return+'%</div><div class="label">总收益</div></div>'
+      +'<div class="metric"><div class="value blue">'+d.profit_factor+'</div><div class="label">盈亏比</div></div>'
+      +'<div class="metric"><div class="value green">+'+d.avg_win_pct+'%</div><div class="label">均盈</div></div>'
+      +'<div class="metric"><div class="value red">'+d.avg_loss_pct+'%</div><div class="label">均亏</div></div>'
+      +'<div class="metric"><div class="value red">'+d.max_drawdown+'%</div><div class="label">最大回撤</div></div>'
+      +'<div class="metric"><div class="value blue">'+d.sharpe_ratio+'</div><div class="label">夏普</div></div>'
+      +'</div><div style="margin-top:8px;font-size:12px;color:#8b949e">'+d.start_date+' ~ '+d.end_date+'</div>';
+    document.getElementById("backtestPanel").innerHTML=h;
+    if(d.equity_curve&&d.equity_curve.length>0){
+      var div=document.createElement("div");
+      div.style.cssText="width:100%;height:200px;margin-top:12px";
+      document.getElementById("backtestPanel").appendChild(div);
+      Plotly.newPlot(div,[{y:d.equity_curve,type:"scatter",mode:"lines",line:{color:"#3fb950",width:2},fill:"tozeroy",fillcolor:"rgba(63,185,80,0.1)"}],{paper_bgcolor:"#161b22",plot_bgcolor:"#161b22",font:{color:"#c9d1d9",size:10},margin:{l:40,r:10,t:10,b:30},yaxis:{gridcolor:"#21262d"},xaxis:{gridcolor:"#21262d"},showlegend:false},{responsive:true,displayModeBar:false});
+    }
+    if(d.trades&&d.trades.length>0){
+      document.getElementById("backtestPanel").innerHTML+='<div style="margin-top:12px;font-size:11px;color:#8b949e">最近交易</div><div class="trade-list">'+d.trades.slice().reverse().map(function(t){return '<div class="trade-row"><span>'+t.entry_date+' '+t.exit_date+'</span><span>'+t.signal_id+'</span><span>'+t.exit_reason+'</span><span class="'+(t.pnl_pct>0?"win":"loss")+'">'+(t.pnl_pct>0?"+":"")+t.pnl_pct+'%</span></div>'}).join("")+'</div>';
+    }
+  }).catch(function(e){document.getElementById("backtestPanel").innerHTML='<div class="error">'+e.message+'</div>'});
+}
+
+function runMonitor(){
+  var code=document.getElementById("codeInput").value;
+  document.getElementById("monitorPanel").innerHTML='<div class="loading">监测中...</div>';
+  document.getElementById("monitorDot").className="dot active";
+  document.getElementById("monitorLabel").textContent="监测中...";
+  fetch(API+"/api/monitor?code="+code).then(function(r){return r.json()}).then(function(d){
+    if(d.error){document.getElementById("monitorPanel").innerHTML='<div class="error">'+d.error+'</div>';document.getElementById("monitorDot").className="dot inactive";document.getElementById("monitorLabel").textContent="错误";return}
+    document.getElementById("monitorDot").className=d.has_alert?"dot active":"dot";
+    document.getElementById("monitorLabel").textContent=d.has_alert?"有信号":"无信号";
+    document.getElementById("monitorPanel").innerHTML='<div class="metrics" style="grid-template-columns:repeat(3,1fr)">'
+      +'<div class="metric"><div class="value blue">'+d.price+'</div><div class="label">最新价</div></div>'
+      +'<div class="metric"><div class="value '+(d.change_pct>=0?"green":"red")+'">'+(d.change_pct>=0?"+":"")+d.change_pct+'%</div><div class="label">涨跌幅</div></div>'
+      +'<div class="metric"><div class="value blue">'+d.volume_ratio+'</div><div class="label">量比</div></div></div>'
+      +'<div style="margin-top:8px;font-size:12px;color:#8b949e">'+d.date+' | '+(d.name||code)+' | '+d.signal_count+'个信号</div>'
+      +'<div style="margin-top:6px">'+(d.signals.length===0?'<div style="color:#8b949e;padding:8px;text-align:center">今日无显著信号</div>':d.signals.map(rSig).join(""))+'</div>';
+  }).catch(function(e){document.getElementById("monitorPanel").innerHTML='<div class="error">'+e.message+'</div>';document.getElementById("monitorDot").className="dot inactive";document.getElementById("monitorLabel").textContent="连接失败"});
+}
+
+// ========== 四层选股 TAB ==========
+function startScreenTimer(){
+  var start=Date.now();
+  screenTimer=setInterval(function(){
+    var elapsed=Math.floor((Date.now()-start)/1000);
+    var m=Math.floor(elapsed/60).toString().padStart(2,"0");
+    var s=(elapsed%60).toString().padStart(2,"0");
+    document.getElementById("screenElapsed").textContent=m+":"+s;
+  },1000);
+}
+
+function updateScreenStatus(msg){
+  document.getElementById("screenStatusText").textContent=msg;
+}
+
+function runScreening(){
+  document.getElementById("btnScreen").disabled=true;
+  document.getElementById("btnScreen").textContent="筛选中...";
+  document.getElementById("screenProgress").style.display="block";
+  document.getElementById("screenStats").style.display="none";
+  document.getElementById("screenResultsPanel").style.display="none";
+  document.getElementById("stockDetail").classList.remove("active");
+  document.getElementById("progressBar").style.animation="none";
+  document.getElementById("progressBar").style.width="5%";
+  document.getElementById("screenElapsed").textContent="00:00";
+  updateScreenStatus("正在获取实时行情...");
+  startScreenTimer();
+
+  // 模拟进度条递增
+  var prog=5;
+  var progTimer=setInterval(function(){
+    prog=Math.min(prog+Math.random()*8,85);
+    document.getElementById("progressBar").style.width=prog+"%";
+  },2000);
+
+  fetch(API+"/api/screen/run").then(function(r){return r.json()}).then(function(d){
+    clearInterval(screenTimer);clearInterval(progTimer);
+    document.getElementById("progressBar").style.width="100%";
+    document.getElementById("btnScreen").disabled=false;
+    document.getElementById("btnScreen").textContent="开始筛选";
+    setTimeout(function(){
+      document.getElementById("screenProgress").style.display="none";
+    },800);
+    if(d.error){document.getElementById("screenStats").style.display="block";document.getElementById("screenStats").textContent="错误: "+d.error;return}
+    var s=d.stats;
+    document.getElementById("screenStats").style.display="block";
+    document.getElementById("screenStats").innerHTML=
+      "总候选 "+d.total_candidates+" | L1通过 "+s.l1_pass+" | L2通过 "+s.l2_pass+" | L3通过 "+s.l3_pass+
+      " | <b>最终 "+d.final_count+" 支</b> | L1淘汰 "+s.l1_fail+" | L2淘汰 "+s.l2_fail+" | L3淘汰 "+s.l3_fail;
+    screenResults=d.stocks||[];
+    renderScreenTable(screenResults);
+    document.getElementById("screenResultsPanel").style.display="block";
+    document.getElementById("screenCount").textContent="(共 "+d.final_count+" 支)";
+  }).catch(function(e){
+    clearInterval(screenTimer);clearInterval(progTimer);
+    document.getElementById("screenProgress").style.display="none";
+    document.getElementById("btnScreen").disabled=false;
+    document.getElementById("btnScreen").textContent="开始筛选";
+    document.getElementById("screenStats").style.display="block";
+    document.getElementById("screenStats").textContent="请求失败: "+e.message;
+  });
+}
+
+function renderScreenTable(stocks){
+  document.getElementById("screenTbody").innerHTML=stocks.map(function(s,i){
+    return '<tr onclick="showStockDetail(\''+s.code+'\')" title="点击查看详情">'
+      +'<td class="rank">'+(i+1)+'</td>'
+      +'<td>'+s.code+'</td><td>'+s.name+'</td>'
+      +'<td class="score-total">'+s.total+'</td>'
+      +'<td>'+s.trend_score.toFixed(0)+'</td>'
+      +'<td>'+s.volume_score.toFixed(0)+'</td>'
+      +'<td>'+s.financial_score.toFixed(0)+'</td>'
+      +'<td>'+s.valuation_score.toFixed(0)+'</td>'
+      +'<td>'+(s.roe!=null?s.roe.toFixed(1):"-")+'</td>'
+      +'<td>'+(s.pe!=null?s.pe.toFixed(1):"-")+'</td>'
+      +'<td class="gain-up">'+(s.gain_20d!=null?s.gain_20d.toFixed(1):"-")+'</td>'
+      +'<td>'+(s.turnover!=null?s.turnover.toFixed(1):"-")+'</td>'
+      +'</tr>';
+  }).join("");
+}
+
+function showStockDetail(code){
+  selectedStockCode=code;
+  document.getElementById("stockDetail").classList.add("active");
+  document.getElementById("detailName").textContent="加载中...";
+  document.getElementById("detailGrid").innerHTML='<div class="loading">加载详情...</div>';
+  fetch(API+"/api/screen/stock/"+code).then(function(r){return r.json()}).then(function(d){
+    if(d.error){document.getElementById("detailGrid").innerHTML='<div class="error">'+d.error+'</div>';return}
+    var s=d.score||{},name=d.name||code;
+    document.getElementById("detailName").textContent=name+" ("+code+")";
+    var items=[
+      ["总分",s.total,"yellow"],["趋势得分",s.trend_score,"blue"],["量能得分",s.volume_score,"blue"],["财务得分",s.financial_score,"blue"],
+      ["估值得分",s.valuation_score,"blue"],["最新价",d.trend.close,"blue"],["MA20",d.trend.ma20,""],["MA60",d.trend.ma60,""],
+      ["ROE%",s.roe!=null?s.roe.toFixed(1):"-",""],["负债率%",s.debt_ratio!=null?s.debt_ratio.toFixed(1):"-",""],
+      ["PE",s.pe!=null?s.pe.toFixed(1):"-",""],["PB",s.pb!=null?s.pb.toFixed(1):"-",""],
+      ["20日涨幅%",d.trend.gain_20d,"green"],["换手率%",d.capital.turnover,""],["量比变化%",d.capital.vol_ratio,""]
+    ];
+    document.getElementById("detailGrid").innerHTML=items.map(function(it){
+      return '<div class="metric"><div class="value '+(it[2]||"")+'">'+it[1]+'</div><div class="label">'+it[0]+'</div></div>';
+    }).join("");
+    if(d.recent_5d&&d.recent_5d.length>0){
+      var rh='<h3 style="font-size:13px;color:#58a6ff;margin-bottom:8px">近5日走势</h3><table class="screen-table"><thead><tr><th>日期</th><th>收盘</th><th>涨跌</th><th>换手%</th><th>成交量</th></tr></thead><tbody>';
+      rh+=d.recent_5d.map(function(r){
+        var cls=r.change_pct>=0?"gain-up":"";
+        return '<tr><td>'+r.date+'</td><td>'+r.close+'</td><td class="'+cls+'">'+(r.change_pct>=0?"+":"")+r.change_pct+'%</td><td>'+r.turnover+'</td><td>'+r.volume+'</td></tr>';
+      }).join("");
+      rh+='</tbody></table>';
+      document.getElementById("detailRecent").innerHTML=rh;
+    }
+  }).catch(function(e){document.getElementById("detailGrid").innerHTML='<div class="error">'+e.message+'</div>'});
+}
+
+function viewInAnalysis(){
+  if(!selectedStockCode)return;
+  document.getElementById("codeInput").value=selectedStockCode;
+  switchTab("analysis");
+  setTimeout(function(){scanSignals()},300);
+}
+
+// Init
+document.getElementById("codeInput").addEventListener("keypress",function(e){if(e.key==="Enter")scanSignals()});
+fetch(API+"/api/signal_definitions").then(function(r){return r.json()}).then(function(d){
+  document.getElementById("signalDefs").innerHTML='<table class="reference-table"><thead><tr><th>ID</th><th>名称</th><th>方向</th><th>规则</th><th>含义</th></tr></thead><tbody>'
+    +d.signals.map(function(s){return '<tr><td><b>'+s.id+'</b></td><td>'+s.name+'</td><td><span class="tag tag-'+(s.direction.indexOf("看多")>=0?"bullish":"bearish")+'">'+s.direction+'</span></td><td>'+s.rule+'</td><td>'+s.meaning+'</td></tr>'}).join("")
+    +'</tbody></table>';
+});
+</script>
+</body>
+</html>
